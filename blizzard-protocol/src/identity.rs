@@ -1,11 +1,9 @@
 #[cfg(not(feature = "std"))]
-use alloc::string::ToString;
-use hkdf::Hkdf;
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
 use snow::Keypair;
 
 use crate::{
-    constants::{ADDRESS_LEN_BYTES, KDF_SALT},
+    constants::{ADDRESS_DERIVATION_SALT, ADDRESS_LEN_BYTES},
     error::BlizzardError,
     message::unicast::Message,
     session::BlizzardSessionHandshake,
@@ -13,14 +11,15 @@ use crate::{
 
 /// Derive a 64-bit fingerprint of a blizzard public key.
 pub fn pubkey_to_address(pubkey: &[u8]) -> Result<Address, BlizzardError> {
-    let mut kdf_buf = [0u8; 8];
-    let hkdf = Hkdf::<Sha256>::new(Some(KDF_SALT), pubkey);
-    hkdf.expand(&[], &mut kdf_buf)
-        .map_err(|_err| BlizzardError::HkdfError {
-            message: "HKDF failed due to invalid length".to_string(),
-        })?;
+    let mut hasher = Sha256::new();
+    hasher.update(ADDRESS_DERIVATION_SALT);
+    hasher.update(pubkey);
+    let digest: [u8; 32] = hasher.finalize().into();
+    let address_bytes: [u8; ADDRESS_LEN_BYTES] = [
+        digest[0], digest[1], digest[2], digest[3], digest[4], digest[5], digest[6], digest[7],
+    ];
     let mut fingerprint = [0u8; ADDRESS_LEN_BYTES];
-    fingerprint.copy_from_slice(&kdf_buf[..ADDRESS_LEN_BYTES]);
+    fingerprint.copy_from_slice(&address_bytes);
     Ok(fingerprint.into())
 }
 

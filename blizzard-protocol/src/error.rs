@@ -87,4 +87,7 @@ pub enum BlizzardError {
         /// The actual size of the source slice.
         actual: usize,
     },
+    /// The peer was not found in the announce packet.
+    #[snafu(display("Peer not found in announce packet"))]
+    PeerNotFound,
 }

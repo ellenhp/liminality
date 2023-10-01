@@ -11,7 +11,7 @@
 pub static PATTERN: &str = "Noise_IK_25519_ChaChaPoly_BLAKE2s";
 
 /// The HKDF salt that blizzard uses to derive an address from a public key.
-pub static KDF_SALT: &[u8] = "_BLIZZARD_PROTOCOL_KDF_SALT_".as_bytes();
+pub static ADDRESS_DERIVATION_SALT: &[u8] = "_BLIZZARD_PROTOCOL_KDF_SALT_".as_bytes();
 
 /// The maximum size of any blizzard message.
 pub const MTU: usize = 242;

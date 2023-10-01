@@ -1,5 +1,6 @@
 use alloc::string::ToString;
 use rand::Rng;
+use sha2::{Digest, Sha256};
 use xorf::{BinaryFuse16, Filter};
 
 use crate::{
@@ -12,6 +13,23 @@ use crate::{
 
 // Empirical.
 const MAX_ANNOUNCE_ADDRESSES: usize = 55;
+
+const MAX_HOPS: u8 = 16;
+
+fn address_to_key(address: &Address, hops: u8) -> u64 {
+    let mut key = u64::from_be_bytes((*address).into());
+    for _ in 8..8 + hops {
+        let mut hasher = Sha256::new();
+        hasher.update(key.to_be_bytes());
+        let digest: [u8; 32] = hasher.finalize().into();
+        // There are cleaner ways of doing this but they involve `unwrap()`, `expect()`, or a `Result` return type.
+        let digest: [u8; 8] = [
+            digest[0], digest[1], digest[2], digest[3], digest[4], digest[5], digest[6], digest[7],
+        ];
+        key = u64::from_be_bytes(digest);
+    }
+    key
+}
 
 /// A blizzard announce message. This is a special type of message that is used to announce the existence of a blizzard node,
 /// conveying a set of addresses that the announcer knows about. These addresses are transfered over the wire in a binary fuse filter.
@@ -41,28 +59,34 @@ impl Announce {
 
     /// Queries whether the given address is in this filter. This is a probabilistic query, and may return false positives.
     /// See the documentation for [`xorf::BinaryFuse16`] for more details.
-    pub fn contains_peer(&self, peer: &Address) -> Result<bool, BlizzardError> {
+    pub fn hops_to(&self, peer: &Address) -> Result<u8, BlizzardError> {
         let xorf: BinaryFuse16 = bincode::deserialize(&self.raw[2..self.len]).map_err(|err| {
             BlizzardError::SerializationError {
                 message: err.to_string(),
             }
         })?;
-        Ok(xorf.contains(&u64::from_be_bytes((*peer).into())))
+        for hop_candidate in 0..MAX_HOPS {
+            let key = address_to_key(peer, hop_candidate);
+            if xorf.contains(&key) {
+                return Ok(hop_candidate);
+            }
+        }
+        Err(BlizzardError::PeerNotFound)
     }
 
-    /// Creates a new announce packet from a list of addresses. The list of peers should be at most [`MAX_ANNOUNCE_ADDRESSES`] in length. Addresses that limit
-    /// may be ignored. The filter will be filled with random data if the list of peers is shorter than [`MAX_ANNOUNCE_ADDRESSES`] to help ensure plausible deniability.
-    pub fn from_peer_list<RngType: Rng>(
-        peers: &[Address],
+    /// Creates a new announce packet from a list of addresses and associated hop counts.
+    /// The list of peers should be at most [`MAX_ANNOUNCE_ADDRESSES`] in length. If a caller provides more, some will be ignored.
+    /// The filter will be filled with random data if the list of peers is shorter than [`MAX_ANNOUNCE_ADDRESSES`] to help ensure plausible deniability.
+    pub fn from_peer_set<RngType: Rng>(
+        peers: &[(Address, u8)],
         rng: &mut RngType,
     ) -> Result<Self, BlizzardError> {
         // The code here relies on addresses being 64 bits, since binary fuse filters operate on u64s.
         debug_assert_eq!(ADDRESS_LEN_BYTES, 8);
         let mut keys = [0u64; MAX_ANNOUNCE_ADDRESSES];
         for (i, key) in keys.iter_mut().enumerate() {
-            *key = if let Some(peer) = peers.get(i) {
-                let key_bytes = (*peer).into();
-                u64::from_be_bytes(key_bytes)
+            *key = if let Some((peer, hops)) = peers.get(i) {
+                address_to_key(peer, *hops)
             } else {
                 rng.gen()
             };
@@ -114,24 +138,24 @@ mod tests {
     #[test]
     fn test_announce() -> Result<(), BlizzardError> {
         let mut rng = thread_rng();
-        let announce_addresses: Vec<Address> = (0..MAX_ANNOUNCE_ADDRESSES)
+        let announce_addresses: Vec<(Address, u8)> = (0..MAX_ANNOUNCE_ADDRESSES)
             .map(|_| {
                 let mut address = [0u8; ADDRESS_LEN_BYTES];
                 rng.fill(&mut address);
-                address.into()
+                (address.into(), 0u8)
             })
             .collect();
-        let announce = Announce::from_peer_list(announce_addresses.as_slice(), &mut rng)?;
+        let announce = Announce::from_peer_set(announce_addresses.as_slice(), &mut rng)?;
         // Empirical.
         assert_eq!(announce.as_slice().len(), 222);
         for address in announce_addresses {
-            assert!(announce.contains_peer(&address)?);
+            assert_eq!(announce.hops_to(&address.0)?, address.1);
         }
         let mut false_positives = 0;
         for _ in 0..10_000 {
             let mut address = [0u8; ADDRESS_LEN_BYTES];
             rng.fill(&mut address);
-            if announce.contains_peer(&address.into())? {
+            if announce.hops_to(&address.into()).is_ok() {
                 false_positives += 1;
             }
         }
