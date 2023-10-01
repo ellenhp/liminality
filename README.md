@@ -18,6 +18,8 @@ Blizzard is not tolerant of sybil attacks, black-holing, or other malicious deni
 is predicated on the assumption that peers are honest and will not attempt to disrupt the network, however bad actors should not be capable of
 compromising the security or anonymity guarantees of the protocol.
 
+Forwarding logic has not yet been defined, so at the moment Blizzard is is only suitable for direct peer-to-peer connections.
+
 ## Features
 
 To the best of my knowledge, blizzard offers initiator anonymity, forward secrecy (each session uses ephemeral keys),
