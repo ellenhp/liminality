@@ -1,0 +1,76 @@
+[package]
+name = "snow"
+description = "A pure-rust implementation of the Noise Protocol Framework"
+homepage = "https://github.com/mcginty/snow"
+documentation = "https://docs.rs/snow/"
+repository = "https://github.com/mcginty/snow"
+version = "0.9.0"
+authors = ["Jake McGinty <me@jakebot.org>", "trevp"]
+license = "Apache-2.0 OR MIT"
+categories = ["cryptography"]
+readme = "README.md"
+keywords = ["noise", "protocol", "crypto"]
+edition = "2018"
+
+# This is slightly mumbo-jumboey, but in short:
+# Features with a -resolver suffix simply enables the existence of a specific resolver,
+# and -accelerated suffix means that this resolver will be the default used by the Builder.
+[features]
+default = ["default-resolver"]
+default-resolver = ["aes-gcm", "chacha20poly1305", "blake2", "sha2", "curve25519-dalek"]
+nightly = ["blake2/simd_opt", "subtle/nightly"]
+ring-resolver = ["ring"]
+ring-accelerated = ["ring-resolver", "default-resolver"]
+libsodium-resolver = ["sodiumoxide", "byteorder"]
+libsodium-accelerated = ["libsodium-resolver", "default-resolver"]
+vector-tests = []
+hfs = []
+pqclean_kyber1024 = ["pqcrypto-kyber", "pqcrypto-traits", "hfs", "default-resolver"]
+xchachapoly = ["chacha20poly1305", "default-resolver"]
+risky-raw-split = []
+
+[[bench]]
+name = "benches"
+harness = false
+
+[badges]
+travis-ci = { repository = "mcginty/snow", branch = "master" }
+
+[dependencies]
+rand_core = { version = "0.6", features = ["getrandom"] }
+subtle = { version = "2.4", default-features = false }
+
+# default crypto provider
+aes-gcm = { version = "0.9", optional = true, default-features = false, features = ["aes"] }
+chacha20poly1305 = { version = "0.9", optional = true, default-features = false }
+blake2 = { version = "0.10", optional = true, default-features = false }
+sha2 = { version = "0.10", optional = true, default-features = false }
+curve25519-dalek = { version = "4", optional = true, default-features = false }
+
+pqcrypto-kyber = { version = "0.7", optional = true }
+pqcrypto-traits = { version = "0.3", optional = true }
+
+# ring crypto provider
+ring = { version = "^0.16.2", optional = true, features = ["std"] }
+# libsodium crypto provider
+sodiumoxide = { version = "0.2", optional = true }
+byteorder = { version = "1.4", optional = true }
+
+[dev-dependencies]
+clap = "4.0"
+criterion = "0.5"
+serde = "1.0"
+serde_json = "1.0"
+serde_derive = "1.0"
+hex = "0.4"
+lazy_static = "1.4"
+x25519-dalek = "2.0"
+rand = "0.8"
+
+[build-dependencies]
+rustc_version = "0.4"
+
+[package.metadata.docs.rs]
+features = [ "ring-resolver", "libsodium-resolver" ]
+all-features = false
+no-default-features = false
