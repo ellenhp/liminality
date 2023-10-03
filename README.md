@@ -1,5 +1,7 @@
 # Blizzard: Delightfully simple delay-tolerant networking
 
+# NOTE: I am in the process of updating this implementation to match a new spec. If you found this after I sent you an RFC please don't go spelunking because this implementation has much weaker privacy properties than what I'm attempting to accomplish with the RFC.
+
 Blizzard is a protocol for setting up authenticated and encrypted channels. It is designed to be used in
 peer-to-peer networks where peers are not necessarily online at the same time i.e. it is a delay-tolerant protocol.
 Unlike most other DTN protocols, it's designed to be used on a microcontroller. This crate is `no_std`-compatible, but does require an allocator.
