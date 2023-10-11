@@ -1,15 +1,10 @@
 # 🌟 Liminality 🌟
 
-Liminality, named for the ephemeral nature of mesh networks, is a unique protocol for wireless communication in fluid and dynamic environments. The protocol takes its name from the liminoid experiences that often unfold in spaces where individuals gather in numbers and disperse. As a delay-tolerant mesh network protocol, Liminality flourishes in these environments, while other network topologies may be shut down[^1] or struggle to provide connectivity. At times other networks may provide connectivity only at the expense of privacy[^2] or, in extreme cases, physical safety[^3].
+Liminality is a unique protocol for wireless communication in fluid and dynamic environments. The protocol takes its name from the liminoid experiences that often unfold in spaces where individuals gather in numbers and disperse. As a delay-tolerant mesh network protocol, Liminality flourishes in these environments, while other network topologies may be shut down[^1] or struggle to provide connectivity. At times, other networks may provide connectivity only at the expense of privacy[^2] or, in extreme cases, physical safety[^3].
 
-Liminality is a network layer built upon the foundation of the IEEE 802.15.4g PHY and MAC layers. By leveraging the 802.15.4g specification, Liminality benefits from a standardized packet format, enabling seamless interoperability among transceivers manufactured by different vendors. Furthermore, the 802.15.4g standard prescribes contention-handling mechanisms for crowded RF environments and offers forward error correction. Operating at layer 3, the Liminality protocol defines the state machine governing association, disassociation, data transfer, and forwarding behavior within Liminality nodes. It covers all behavior required to get raw data from A to B.
+Liminality is a network layer built upon the foundation of the IEEE 802.15.4g PHY and MAC layers. By leveraging the 802.15.4g specification, Liminality benefits from a standardized packet format, enabling seamless interoperability among transceivers manufactured by different vendors. Furthermore, the 802.15.4g standard prescribes contention-handling mechanisms for crowded RF environments and offers forward error correction. The Liminality protocol defines the state machine governing association, disassociation, data transfer, and forwarding behavior within Liminality nodes. It covers all the behavior required to get raw data from A to B.
 
 Liminality uses the [noise protocol framework](http://www.noiseprotocol.org/noise.html) to provide security guarantees, configured in the `Noise_IK_25519_ChaChaPoly_BLAKE2s` pattern. Building on top of noise enables Liminality to provide trustworthy security properties, which are often unattainable for protocols relying on bespoke usages of cryptographic primitives unless subjected to thorough audits.
-
-[^1] http://archive.today/2013.01.30-230311/http://www.nytimes.com/2011/01/29/technology/internet/29cutoff.html?_r=0
-[^3] http://archive.today/2023.09.08-125532/https://www.wsj.com/amp/articles/americans-cellphones-targeted-in-secret-u-s-spy-program-1415917533
-[^2] http://archive.today/2019.12.23-235637/https://www.nytimes.com/interactive/2019/12/21/opinion/location-data-democracy-protests.html
-
 
 ## Features
 
@@ -61,12 +56,12 @@ Message packets correspond to the packet type `0b0000` and contain a payload of 
 | Bytes | Field name | Purpose |
 |---|---|---|
 | 0:31 | Message ID scalar | Serves as the message ID in conjunction with the point. Encoded as a 32-byte big-endian integer. |
-| 32:63 | Message ID point | Serves as the message ID in conjunction with the scalar. Encoded in a compressed format for Edwards |
+| 32:63 | Message ID point | Serves as the message ID in conjunction with the scalar. Encoded in a compressed wire format. |
 | 64: | Payload | Contains a noise message with information from the transport layer. |
 
 #### Message IDs
 
-As shown in the table above, message IDs contain a 32-byte scalar `sₘ ∈ 𝕫`, encoded as a 32-byte big-endian integer, and a Ristretto point on Curve25519, encoded in a compressed 32-byte format for Edwards-form points. The message's sender derives a scalar `s₀ ∈ 𝕫` by hashing the noise handshake hash concatenated with the recipient's public key. Specifically, they must compute `s₀ = blake2s(handshake_hash ∥ public_key) % ℓ` where `blake2s` uses a 32 byte digest. After computing `s₀`, the sender will compute `P₀ = s₀ * base` where `base` is the Curve25519 base point. After generating `P₀`, the sender will choose a scalar `sₘ ∈ 𝕫` using a CPRNG and compute a point `Pₘ = P₀ * sₘ`. The 64-byte message ID is the big-endian form of `sₘ` concatenated with the compressed wire format of `Pₘ`.
+As shown in the table above, message IDs contain a 32-byte scalar `sₘ ∈ 𝕫`, encoded as a 32-byte big-endian integer, and a Ristretto point on the Edwards form of Curve25519, encoded in a compressed 32-byte format for Edwards-form points. The message's sender derives a scalar `s₀ ∈ 𝕫` by hashing the noise handshake hash concatenated with the recipient's public key. Specifically, they must compute `s₀ = blake2s(handshake_hash ∥ public_key) % ℓ` where `blake2s` uses a 32 byte digest. After computing `s₀`, the sender will compute a session point `P₀ = s₀ * base` where `base` is the curve's base point. After generating `P₀`, the sender will choose a scalar `sₘ ∈ 𝕫` using a CPRNG and compute a point `Pₘ = P₀ * sₘ`. The 64-byte message ID is the big-endian form of `sₘ` concatenated with the Edwards-form compressed wire format of `Pₘ`.
 
 ### Advertisement packets
 
@@ -83,11 +78,11 @@ After the advertisement header byte, advertisement packets contain a flat list o
 
 ### Delivery offer packets
 
-Delivery offer packets correspond to packet type `0b0010` and exist to communicate the set of messages a peer has in its possession for final delivery. Delivery offers begin with a 2-byte big-endian integer called the sequence number, representing the number of delivery offer packets a node intends to transmit following the current one. Nodes may transmit delivery offer packets in any order as long as the *sequence number* monotonically decreases and ends at zero.
+Delivery offer packets correspond to packet type `0b0010` and exist to communicate the set of messages a peer has in its possession for final delivery. Delivery offers begin with a 1-byte integer called the sequence number, representing the number of delivery offer packets a node intends to transmit following the current one. Nodes may transmit delivery offer packets in any order as long as the sequence number monotonically decreases and ends at zero.
 
-After the sequence number, delivery offer packets contain a 32-byte big-endian representation of a scalar `sₘ` and a 32-byte compressed representation of a point `Pₘ` in the Ristretto group of Curve25519. Points should be serialized and deserialized in Edwards form. Critically, delivery offers do **not** convey original message IDs verbatim.
+After the sequence number, delivery offer packets contain a flat list of message IDs, each of which contains a 32-byte big-endian representation of a scalar `sₘ` and a 32-byte compressed representation of a point `Pₘ` in the Ristretto group of Curve25519. Critically, delivery offers do **not** convey original message IDs verbatim.
 
-Instead, nodes offering delivery will choose a scalar `s₀ ∈ 𝕫` using a CPRNG and compute a scalar `s = sₘ * s₀`. Then, they compute a point `P = Pₘ * s`. This computation yields a new message ID that maintains the verifiability properties of the original message ID.
+Instead, nodes offering delivery will choose a scalar `s₀ ∈ 𝕫` using a CPRNG and compute a scalar `s = sₘ * s₀`. Then, they compute a point `P = Pₘ * s`. This computation yields a new message ID that maintains the verifiability properties of the original message ID only for those who know the message ID's session point.
 
 #### Verification of delivery offers
 
@@ -96,7 +91,7 @@ For any channel `ch`, the handshake hash and the recipient's public key are know
 When a node receives a delivery offer, it will test the message ID against each of its open channels by following these steps:
 1. It will derive `s₀` from a channel's handshake hash and its public key.
 2. It will compute `s = sₘ * s₀`.
-3. The node will compute `P = s * base` where `base` is the Curve25519 base point.
+3. The node will compute `P = s * base` where `base` is the curve's base point.
 If `P` equals `Pₘ`, the message on offer belongs to the tested channel, and the recipient will issue a message request packet.
 
 ### Message request packets
@@ -129,7 +124,7 @@ Messages may be authored at any time by any node. When authored, a message enter
 
 ### Beaconing, association and disassociation
 
-Each node announces an 802.15.4 network by emitting beacon packets every 180 seconds unless a user has forced the node to obey radio silence. After sending a beacon packet, a node should respond to association requests for the announced network for at least 180 seconds but no longer than 15 minutes. Nodes should rotate identifiers they use to beacon at a 15-minute interval and under no circumstances less often than one hour. When a node, Alice, detects a new network beaconed by node Bob, she may choose to connect to Bob's network to exchange data. Nodes enter and leave other nodes' networks opportunistically.
+Each node announces an 802.15.4g network by emitting beacon packets every 180 seconds unless a user has forced the node to obey radio silence. After sending a beacon packet, a node should respond to association requests for the announced network for at least 180 seconds but no longer than 15 minutes. Nodes should rotate identifiers they use to beacon at a 15-minute interval and under no circumstances less often than one hour. When a node, Alice, detects a new network beaconed by node Bob, she may choose to connect to Bob's network to exchange data. Nodes enter and leave other nodes' networks opportunistically.
 
 ### Advertising messages
 
@@ -154,7 +149,7 @@ A peer may request after delivery offers are exchanged. Messages received via a 
 ### Typical message exchange
 
 A typical encounter between Liminality peers follows:
-1. Peer A beacons according to 802.15.4.
+1. Peer A beacons according to 802.15.4g.
 2. Peer A waits and returns to step 1 if there are no association requests.
 3. Peer B associates with Peer A's network.
 4. Peer B advertises the messages it has available for distribution.
@@ -184,3 +179,7 @@ If Alice wants to talk to Bob, she must ask Bob out-of-band for a 32-byte noise 
 ## Feedback!
 
 Please feel free to reach out if you have feedback. You can reach me at: `[my first name]@[my github username].me`
+
+[^1]: http://archive.today/2013.01.30-230311/http://www.nytimes.com/2011/01/29/technology/internet/29cutoff.html?_r=0
+[^2]: http://archive.today/2023.09.08-125532/https://www.wsj.com/amp/articles/americans-cellphones-targeted-in-secret-u-s-spy-program-1415917533
+[^3]: http://archive.today/2019.12.23-235637/https://www.nytimes.com/interactive/2019/12/21/opinion/location-data-democracy-protests.html
