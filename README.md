@@ -12,8 +12,8 @@ To the best of my knowledge, Liminality offers the following properties:
 
 1. **Simplicity**: Liminality keeps things uncomplicated with just four message types and an easily comprehensible state machine.
 2. **Initiator Privacy**: Observers outside a channel remain unaware of the public key or any long-term identifiers associated with the initiator, preserving a degree of privacy.
-3. **Limited Recipient Privacy**: When identifying oneself as the recipient to trigger message delivery, Liminality avoids revealing information that could be used for fingerprinting, apart from metadata about delivery, such as the time, location, and ciphertext of the radio transmission.
-4. **Relay Privacy**: Delivering a message avoids disclosing information suitable for fingerprinting, limited to time, location, and message ciphertext.
+3. **Limited Recipient Privacy**: When identifying oneself as the recipient to trigger message delivery, Liminality avoids revealing information that could be used for fingerprinting, apart from metadata about delivery, such as the time, location, and ciphertext of the radio transmission. This privacy comes with [caveats](#known-issues).
+4. **Relay Privacy**: Delivering a message avoids disclosing information suitable for fingerprinting, only leaking the time, location, and message ciphertext.
 5. **Forward Secrecy**: Each channel uses a new ephemeral key derived via an ECDH handshake. The handshake uses ephemeral keys for all messages except the first in a channel, which uses a recipient's static key.
 6. **Low Latency**: Liminality uses a noise handshake pattern that enables 0-RTT handshakes.
 7. **Efficient Bandwidth Utilization**: Liminality incorporates a modified spray-and-wait routing mechanism, allowing for efficient network bandwidth utilization.
@@ -61,7 +61,7 @@ Message packets correspond to the packet type `0b0000` and contain a payload of 
 
 #### Message IDs
 
-As shown in the table above, message IDs contain a 32-byte scalar `sₘ ∈ 𝕫`, encoded as a 32-byte big-endian integer, and a Ristretto point on the Edwards form of Curve25519, encoded in a compressed 32-byte format for Edwards-form points. The message's sender derives a scalar `s₀ ∈ 𝕫` by hashing the noise handshake hash concatenated with the recipient's public key. Specifically, they must compute `s₀ = blake2s(handshake_hash ∥ public_key) % ℓ` where `blake2s` uses a 32 byte digest. After computing `s₀`, the sender will compute a session point `P₀ = s₀ * base` where `base` is the curve's base point. After generating `P₀`, the sender will choose a scalar `sₘ ∈ 𝕫` using a CPRNG and compute a point `Pₘ = P₀ * sₘ`. The 64-byte message ID is the big-endian form of `sₘ` concatenated with the Edwards-form compressed wire format of `Pₘ`.
+As shown in the table above, message IDs contain a 32-byte scalar `sₘ ∈ 𝕫`, encoded as a 32-byte big-endian integer, and a Ristretto point on the Edwards form of Curve25519, encoded in a compressed 32-byte format for Edwards-form points. The message's sender derives a scalar `s₀ ∈ 𝕫` by hashing the noise handshake hash concatenated with the recipient's public key. Specifically, they must compute `s₀ = blake2s(handshake_hash ∥ public_key ∥ timestamp) % ℓ` where `blake2s` uses a 32 byte digest and `timestamp` is the number of hours since the unix epoch, represented as a 32 bit integer. After computing `s₀`, the sender will compute a session point `P₀ = s₀ * base` where `base` is the curve's base point. After generating `P₀`, the sender will choose a scalar `sₘ ∈ 𝕫` using a CPRNG and compute a point `Pₘ = P₀ * sₘ`. The 64-byte message ID is the big-endian form of `sₘ` concatenated with the Edwards-form compressed wire format of `Pₘ`.
 
 ### Advertisement packets
 
@@ -82,14 +82,14 @@ Delivery offer packets correspond to packet type `0b0010` and exist to communica
 
 After the sequence number, delivery offer packets contain a flat list of message IDs, each of which contains a 32-byte big-endian representation of a scalar `sₘ` and a 32-byte compressed representation of a point `Pₘ` in the Ristretto group of Curve25519. Critically, delivery offers do **not** convey original message IDs verbatim.
 
-Instead, nodes offering delivery will choose a scalar `s₀ ∈ 𝕫` using a CPRNG and compute a scalar `s = sₘ * s₀`. Then, they compute a point `P = Pₘ * s`. This computation yields a new message ID that maintains the verifiability properties of the original message ID only for those who know the message ID's session point.
+Instead, nodes offering delivery will choose a scalar `s₀ ∈ 𝕫` using a CPRNG and compute a new scalar `s = sₘ * s₀`. Then, they compute a point `P = Pₘ * s`. These computations yield a new message ID that maintains the verifiability properties of the original message ID only for those who know the message ID's session point.
 
 #### Verification of delivery offers
 
 For any channel `ch`, the handshake hash and the recipient's public key are known to both sender and receiver. With that information, the receiver can determine if the session point used to create the original message ID matches their session point for `ch`.
 
 When a node receives a delivery offer, it will test the message ID against each of its open channels by following these steps:
-1. It will derive `s₀` from a channel's handshake hash and its public key.
+1. It will derive `s₀` from a channel's handshake hash, its public key and the number of hours since the unix epoch. Implementations should perform this test several times, each with a different value for the timestamp. Implementations should go back at least 12 hours to ensure they don't miss deliveries of older messages.
 2. It will compute `s = sₘ * s₀`.
 3. The node will compute `P = s * base` where `base` is the curve's base point.
 If `P` equals `Pₘ`, the message on offer belongs to the tested channel, and the recipient will issue a message request packet.
@@ -170,7 +170,7 @@ If Alice wants to talk to Bob, she must ask Bob out-of-band for a 32-byte noise 
 
 ## Known issues
 
-1. If an adversary obtains a message ID belonging to a channel with known endpoints, they can replay delivery offers to any node they encounter by multiplying that message ID by a new random scalar each time. The attacker can know they will always trigger message requests from the recipient. This type of replay attack compromises recipient privacy. In larger networks, on average, the adversary will experience a false message request after offering a message for delivery to 34 nodes. Unfortunately, a malicious adversary could offer delivery of several fake packets and note that a node taking all of those packets is likely not requesting them as chaff. A future version of Liminality will include ratcheting mechanisms to reduce the time window that a fingerprinting attack like this will work.
+1. If an adversary obtains a message ID belonging to a channel with known endpoints, they can replay delivery offers to any node they encounter by multiplying that message ID by a new random scalar each time. The attacker can know they will always trigger message requests from the recipient. This replay attack can cause recipients to identify themselves repeatedly, which could be used by an attacker to fingerprint and track a node. This replay will only work until the TTL expires. A future version of Liminality will address this more robustly.
 
 ## Implementation Gotchas
 
