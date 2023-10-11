@@ -60,8 +60,8 @@ pub mod error;
 /// Identity management.
 pub mod identity;
 
-/// Messages that can be sent over the blizzard protocol.
-pub mod message;
+/// Packets that can be sent over the blizzard protocol.
+pub mod packet;
 
 /// A blizzard session.
 pub mod session;

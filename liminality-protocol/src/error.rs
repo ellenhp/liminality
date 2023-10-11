@@ -1,6 +1,6 @@
 use snafu::Snafu;
 
-use crate::{identity::Address, types::String};
+use crate::types::String;
 
 /// Common error type for the `blizzard` crate.
 #[derive(Debug, Snafu)]
@@ -41,25 +41,11 @@ pub enum BlizzardError {
         /// The actual length of the slice.
         actual: usize,
     },
-    /// Failed to create a binary fuse filter during the construction of an announce packet.
-    /// The creation of a binary fuse filter is unfortunately not deterministic, so downstream applications should handle this error.
-    #[snafu(display("BinaryFuse filter construction failed: {}", message))]
-    BinaryFuseError {
-        /// Human-readable message describing the error.
-        message: String,
-    },
     /// Failed to serialize or deserialize a struct. This is likely not a usage issue, unless the downstream application's data store was corrupted.
     #[snafu(display("(De)serializaiton failed: {}", message))]
     SerializationError {
         /// Human-readable message describing what exactly failed to deserialize.
         message: String,
-    },
-    /// Attempted to parse a packet with an invalid address. This is thrown when you try to decrypt a message intended for a different identity.
-    /// This is entirely recoverable and should be handled by the application.
-    #[snafu(display("Invalid address: {:?}", address))]
-    InvalidAddress {
-        /// The destination address that was detected.
-        address: Address,
     },
     /// An error occurred while performing a HKDF operation. This is not a usage issue and indicates a bug inside of blizzard.
     #[snafu(display("Error in HKDF: {}", message))]
@@ -90,4 +76,13 @@ pub enum BlizzardError {
     /// The peer was not found in the announce packet.
     #[snafu(display("Peer not found in announce packet"))]
     PeerNotFound,
+    /// Unspecified cryptography error.
+    #[snafu(display("Cryptography error: {}", message))]
+    CryptoError {
+        /// Human-readable message describing the error.
+        message: String,
+    },
+    /// The provided message is not part of this channel.
+    #[snafu(display("Message not part of this channel"))]
+    MessageNotPartOfChannel,
 }

@@ -10,14 +10,11 @@
 /// Especially section 7.7 for details on the security implications of selecting the IK pattern.
 pub static PATTERN: &str = "Noise_IK_25519_ChaChaPoly_BLAKE2s";
 
-/// The HKDF salt that blizzard uses to derive an address from a public key.
-pub static ADDRESS_DERIVATION_SALT: &[u8] = "_BLIZZARD_PROTOCOL_KDF_SALT_".as_bytes();
-
 /// The maximum size of any blizzard message.
-pub const MTU: usize = 242;
+pub const MTU: usize = 2048;
 
-/// The length of a blizzard address in bytes.
-pub const ADDRESS_LEN_BYTES: usize = 8;
+/// The length of a blizzard message ID in bytes.
+pub const MESSAGE_ID_LEN_BYTES: usize = 64;
 
 /// The length of a blizzard HMAC in bytes.
 pub const NOISE_HMAC_LENGTH_BYTES: usize = 16;

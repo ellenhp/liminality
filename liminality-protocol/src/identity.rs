@@ -1,71 +1,14 @@
 #[cfg(not(feature = "std"))]
-use sha2::{Digest, Sha256};
+use alloc::vec::Vec;
 use snow::Keypair;
 
-use crate::{
-    constants::{ADDRESS_DERIVATION_SALT, ADDRESS_LEN_BYTES},
-    error::BlizzardError,
-    message::unicast::Message,
-    session::BlizzardSessionHandshake,
-};
-
-/// Derive a 64-bit fingerprint of a blizzard public key.
-pub fn pubkey_to_address(pubkey: &[u8]) -> Result<Address, BlizzardError> {
-    let mut hasher = Sha256::new();
-    hasher.update(ADDRESS_DERIVATION_SALT);
-    hasher.update(pubkey);
-    let digest: [u8; 32] = hasher.finalize().into();
-    let address_bytes: [u8; ADDRESS_LEN_BYTES] = [
-        digest[0], digest[1], digest[2], digest[3], digest[4], digest[5], digest[6], digest[7],
-    ];
-    let mut fingerprint = [0u8; ADDRESS_LEN_BYTES];
-    fingerprint.copy_from_slice(&address_bytes);
-    Ok(fingerprint.into())
-}
-
-/// A 64-bit fingerprint of a blizzard public key.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct Address {
-    raw: [u8; ADDRESS_LEN_BYTES],
-}
-
-impl From<[u8; ADDRESS_LEN_BYTES]> for Address {
-    fn from(value: [u8; ADDRESS_LEN_BYTES]) -> Self {
-        Self { raw: value }
-    }
-}
-
-impl TryFrom<&[u8]> for Address {
-    type Error = BlizzardError;
-
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        if value.len() != ADDRESS_LEN_BYTES {
-            return Err(BlizzardError::SliceIncorrectLength {
-                expected: ADDRESS_LEN_BYTES,
-                actual: value.len(),
-            });
-        }
-        let mut raw = [0u8; ADDRESS_LEN_BYTES];
-        raw.copy_from_slice(value);
-        Ok(Self { raw })
-    }
-}
-
-impl From<Address> for [u8; ADDRESS_LEN_BYTES] {
-    fn from(value: Address) -> Self {
-        value.raw
-    }
-}
+use crate::{error::BlizzardError, packet::message::Message, session::BlizzardSessionHandshake};
 
 /// A trait for types that can be used as a Blizzard identity.
 pub trait Identity {
     /// Get the public key of this identity. There's no reason to share this with a peer outside the context of a handshake,
-    /// but doing so does not compromise the security properties of the protocol.
+    /// but doing so does not compromise the security or privacy properties of the protocol.
     fn pubkey(&self) -> &[u8; 32];
-    /// Returns the [`Address`] of this identity. This is an HDKF-derived fingerprint of the public key with the blizzard network salt.
-    fn address(&self) -> Result<Address, BlizzardError> {
-        pubkey_to_address(self.pubkey())
-    }
 }
 
 /// A local identity that can be used to initiate a handshake with a remote peer. This is a wrapper around a [`snow::Keypair`].
@@ -138,18 +81,12 @@ impl LocalIdentity {
     }
 
     /// Attempt to respond to an incoming handshake request.
-    /// Returns a [`BlizzardError::InvalidAddress`] if the destination address of the incoming message does not match this identity's address.
     /// Returns a [`BlizzardError::SnowError`] if the handshake state machine fails.
     /// Returns a [`BlizzardError::SliceIncorrectLength`] if the incoming message's payload is not the exact size of a noise public key.
     pub fn maybe_handshake(
         &self,
         incoming: &Message,
     ) -> Result<BlizzardSessionHandshake, BlizzardError> {
-        if self.address()? != incoming.destination_address()? {
-            return Err(BlizzardError::InvalidAddress {
-                address: incoming.destination_address()?,
-            });
-        }
         let builder = snow::Builder::new(
             crate::constants::PATTERN
                 .parse()

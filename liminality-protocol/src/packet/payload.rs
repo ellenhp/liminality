@@ -62,7 +62,7 @@ mod tests {
     #[test]
     fn test_size_limit() -> Result<(), BlizzardError> {
         let mut payload = super::Payload::new();
-        let result = payload.copy_from_slice(&[0u8; 1024]);
+        let result = payload.copy_from_slice(&[0u8; 1024 * 1024]);
         assert!(result.is_err());
         Ok(())
     }

@@ -1,0 +1,25 @@
+[package]
+name = "liminality-protocol"
+version = "0.1.0"
+edition = "2021"
+description = "Privacy-first delay tolerant network protocol"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/ellenhp/liminality/"
+keywords = ["no-std", "no_std", "cryptography", "crypto", "dtn"]
+readme = "../README.md"
+
+[dependencies]
+snow = { path = "../snow" }
+snafu = { version = "0.7", default-features = false, features = ["rust_1_61"] }
+async-trait = "0.1"
+rand = { version = "0.8", default-features = false }
+curve25519-dalek = { version = "4.1.1", default-features = false, features = ["alloc", "zeroize", "digest"] }
+blake2 = { version = "0.10.6", default-features = false }
+
+[dev-dependencies]
+rand = "0.8"
+
+[features]
+default = ["size-unconstrained", "std"]
+std = []
+size-unconstrained = ["curve25519-dalek/precomputed-tables"]
