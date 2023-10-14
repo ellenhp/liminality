@@ -1,8 +1,8 @@
 # 🌟 Liminality 🌟
 
-Liminality is a unique protocol for wireless communication in fluid and dynamic environments. The protocol takes its name from the liminoid experiences that often unfold in spaces where individuals gather in numbers and disperse. As a delay-tolerant mesh network protocol, Liminality flourishes in these environments, while other network topologies may be shut down[^1] or struggle to provide connectivity. At times, other networks may provide connectivity only at the expense of privacy[^2] or, in extreme cases, physical safety[^3].
+Liminality is a unique protocol for wireless communication in fluid and dynamic environments. The protocol takes its name from the liminoid experiences that often unfold in spaces where individuals gather in numbers and disperse. As a disruption-tolerant mesh network protocol, Liminality flourishes in these environments, while other network topologies may be shut down[^1] or struggle to provide connectivity. At times, other networks may provide connectivity only at the expense of privacy[^2] or, in extreme cases, physical safety[^3].
 
-Liminality is a network layer built upon the foundation of the IEEE 802.15.4g PHY and MAC layers. By leveraging the 802.15.4g specification, Liminality benefits from a standardized packet format, enabling seamless interoperability among transceivers manufactured by different vendors. Furthermore, the 802.15.4g standard prescribes contention-handling mechanisms for crowded RF environments and offers forward error correction. The Liminality protocol defines the state machine governing association, disassociation, data transfer, and forwarding behavior within Liminality nodes. It covers all the behavior required to get raw data from A to B.
+Liminality is a network layer built upon the foundation of the IEEE 802.15.4g PHY and MAC layers. By leveraging the 802.15.4g specification, Liminality benefits from a standardized packet format, enabling interoperability among transceivers manufactured by different vendors. Furthermore, the 802.15.4g standard prescribes contention-handling mechanisms for crowded RF environments and offers forward error correction. The Liminality protocol defines the state machine governing association, disassociation, data transfer, and forwarding behavior within Liminality nodes. It covers all the behavior required to get raw data from A to B.
 
 Liminality uses the [noise protocol framework](http://www.noiseprotocol.org/noise.html) to provide security guarantees, configured in the `Noise_IK_25519_ChaChaPoly_BLAKE2s` pattern. Building on top of noise enables Liminality to provide trustworthy security properties, which are often unattainable for protocols relying on bespoke usages of cryptographic primitives unless subjected to thorough audits.
 
@@ -12,18 +12,22 @@ To the best of my knowledge, Liminality offers the following properties:
 
 1. **Simplicity**: Liminality keeps things uncomplicated with just four message types and an easily comprehensible state machine.
 2. **Initiator Privacy**: Observers outside a channel remain unaware of the public key or any long-term identifiers associated with the initiator, preserving a degree of privacy.
-3. **Limited Recipient Privacy**: When identifying oneself as the recipient to trigger message delivery, Liminality avoids revealing information that could be used for fingerprinting, apart from metadata about delivery, such as the time, location, and ciphertext of the radio transmission. This privacy comes with [caveats](#known-issues).
+3. **Recipient Privacy**: When identifying oneself as the recipient to trigger message delivery, Liminality avoids revealing information that could be used for fingerprinting, apart from metadata about delivery, such as the time, location, and ciphertext of the radio transmission.
 4. **Relay Privacy**: Delivering a message avoids disclosing information suitable for fingerprinting, only leaking the time, location, and message ciphertext.
 5. **Forward Secrecy**: Each channel uses a new ephemeral key derived via an ECDH handshake. The handshake uses ephemeral keys for all messages except the first in a channel, which uses a recipient's static key.
 6. **Low Latency**: Liminality uses a noise handshake pattern that enables 0-RTT handshakes.
 7. **Efficient Bandwidth Utilization**: Liminality incorporates a modified spray-and-wait routing mechanism, allowing for efficient network bandwidth utilization.
 8. **Authenticated and Encrypted Channels**: Outside observers of a channel are incapable of forging or reading messages within it.
 
-It's critical to note that Liminality has yet to undergo a formal audit. While it offers useful properties, it may not withstand sophisticated attackers such as state actors. This is especially true of its privacy properties, which do rely on some un-audited raw operations on Curve25519, and come with some [serious caveats](#known-issues) for the time being. Consider this carefully in situations where strong guarantees are necessary to protect life, property, or safety. While it is exciting and novel that a delay-tolerant network is able to provide these security and privacy properties, an end-to-end encrypted messaging app of your choosing has similar or superior security and privacy in an information-theoretic sense, at the expense of censorship resistance and being trivially trackable through physical space. 
+It's important to note that Liminality has yet to undergo a formal audit. While it offers useful properties, it may not withstand sophisticated attackers such as state actors. This is especially true of its privacy properties, which rely on some un-audited raw operations on Curve25519. Consider this carefully in situations where strong guarantees are necessary to protect life, property, or safety. While it is exciting and novel that a disruption/delay-tolerant network is able to provide these security and privacy properties, an end-to-end encrypted messaging app of your choosing has similar or superior security and privacy in an information-theoretic sense, at the expense of censorship resistance and being trivially trackable through physical space.
+
+## Future work
+
+A reference implementation is in-progress, as is a few parallel hardware efforts. Initial hardware targets are low-cost self-powered relay nodes (BOM cost < USD$15) and a new motherboard and modem for the Nokia 3310 handset along with software to send and receive messages using the liminality protocol.
 
 ## Non-goals
 
-Liminality prioritizes security and anonymity but acknowledges certain limitations. The protocol does not provide resistance against malicious denial-of-service behavior, such as Sybil attacks, flooding, or black-hole attacks. Network operation assumes that peers are honest and will not engage in disruptive activities. Addressing these issues falls outside the protocol's scope, as they pose complex challenges, primarily of academic interest. Individuals capable of launching denial-of-service attacks on a delay-tolerant network can often do so through multiple avenues, making effective prevention impractical. While protocol-level denial-of-service attacks may be mitigated through thoughtful design, determined attackers can often shift their focus to the physical layer without losing efficacy.
+Liminality prioritizes security and anonymity but comes with some limitations. The protocol does not provide resistance against malicious denial-of-service behavior, such as Sybil attacks, flooding, or black-hole attacks. Network operation assumes that peers are honest and will not engage in disruptive activities. Addressing these issues falls outside the protocol's scope, as they pose complex challenges, primarily of academic interest. Individuals capable of launching denial-of-service attacks on a delay-tolerant network can often do so through multiple avenues, making effective prevention impractical. While protocol-level denial-of-service attacks may be mitigated through thoughtful design, determined attackers can often shift their focus to the physical layer without losing efficacy.
 
 ## Wire format
 
@@ -38,7 +42,7 @@ The subsequent sections describe the functionality of each packet type.
 
 ### Conventions
 
-While the noise protocol framework provides confidentiality and authenticity guarantees, Liminality provides its privacy guarantees through raw operations on Curve25519. This document defines "scalars" as large integers named `s`, sometimes with subscripts. Scalars are members of the prime field `𝕫` defined by the prime `ℓ=2^252+27742317777372353535851937790883648493`. This document defines points on Curve25519 as variables named `P`, sometimes with subscripts. Points in Liminality are members of the Ristretto group of Curve25519. Implementations must perform all arithmetic on scalars and Ristretto points modulo `ℓ`.
+While the noise protocol framework provides confidentiality and authenticity guarantees, Liminality provides its privacy guarantees through raw operations on Curve25519. When discussing elliptic curve math, this document defines "scalars" as large integers named `s`, sometimes with subscripts. Scalars are members of the prime field `𝕫` defined by the prime `ℓ=2^252+27742317777372353535851937790883648493`. This document defines points on Curve25519 as variables named `P`, sometimes with subscripts. Points in Liminality are members of the Ristretto group of the Edwards form of Curve25519. Implementations must perform all arithmetic on scalars and Ristretto points modulo `ℓ`.
 
 ### Common features
 
@@ -57,11 +61,19 @@ Message packets correspond to the packet type `0b0000` and contain a payload of 
 |---|---|---|
 | 0:31 | Message ID scalar | Serves as the message ID in conjunction with the point. Encoded as a 32-byte big-endian integer. |
 | 32:63 | Message ID point | Serves as the message ID in conjunction with the scalar. Encoded in a compressed wire format. |
-| 64: | Payload | Contains a noise message with information from the transport layer. |
+| 64: | Payload | Contains a noise message with information from the application layer. |
 
 #### Message IDs
 
-As shown in the table above, message IDs contain a 32-byte scalar `sₘ ∈ 𝕫`, encoded as a 32-byte big-endian integer, and a Ristretto point on the Edwards form of Curve25519, encoded in a compressed 32-byte format for Edwards-form points. The message's sender derives a scalar `s₀ ∈ 𝕫` by hashing the noise handshake hash concatenated with the recipient's public key. Specifically, they must compute `s₀ = blake2s(handshake_hash ∥ public_key ∥ timestamp) % ℓ` where `blake2s` uses a 32 byte digest and `timestamp` is the number of hours since the unix epoch, represented as a 32 bit integer. After computing `s₀`, the sender will compute a session point `P₀ = s₀ * base` where `base` is the curve's base point. After generating `P₀`, the sender will choose a scalar `sₘ ∈ 𝕫` using a CPRNG and compute a point `Pₘ = P₀ * sₘ`. The 64-byte message ID is the big-endian form of `sₘ` concatenated with the Edwards-form compressed wire format of `Pₘ`.
+As shown in the table above, message IDs contain a 32-byte scalar `sₘ ∈ 𝕫`, encoded as a 32-byte big-endian integer, and a Ristretto point on the Edwards form of Curve25519, encoded in a compressed 32-byte format for Edwards-form points. The message's sender derives a scalar `s₀ ∈ 𝕫` by hashing the noise handshake hash concatenated with the recipient's public key. Specifically, they must compute `s₀ = blake2s(handshake_hash ∥ public_key ∥ extra) % ℓ` where `blake2s` uses a 32 byte digest and `extra` is defined later. After computing `s₀`, the sender will interpret it as a 256-bit little-endian integer and compute a point `P₀ = s₀ * base` where `base` is the curve's base point. After generating `P₀`, the sender will choose a scalar `sₘ ∈ 𝕫` using a CPRNG and compute a point `Pₘ = P₀ * sₘ`. The 64-byte message ID is the big-endian form of `sₘ` concatenated with the Edwards-form compressed wire format of `Pₘ`.
+
+Each new message in a channel must have a unique message ID.
+
+The value of `extra` may be:
+1. The number of hours since the Unix epoch, represented as a 32-bit big endian integer prefixed with the salt "HOUR". In order to satisfy the uniqueness requirements, nodes may only use this form of `extra` once per hour.
+2. The ASCII representation of the message packet's sequence number, [defined later](#format-of-noise-messages), prefixed with the salt "SEQ".
+
+Option 1 should be preferred for the first packet sent in any particular hour if both nodes in a channel have an RTC. If either node does not have an RTC, the second form should be used exclusively.
 
 ### Advertisement packets
 
@@ -82,17 +94,18 @@ Delivery offer packets correspond to packet type `0b0010` and exist to communica
 
 After the sequence number, delivery offer packets contain a flat list of message IDs, each of which contains a 32-byte big-endian representation of a scalar `sₘ` and a 32-byte compressed representation of a point `Pₘ` in the Ristretto group of Curve25519. Critically, delivery offers do **not** convey original message IDs verbatim.
 
-Instead, nodes offering delivery will choose a scalar `s₀ ∈ 𝕫` using a CPRNG and compute a new scalar `s = sₘ * s₀`. Then, they compute a point `P = Pₘ * s`. These computations yield a new message ID that maintains the verifiability properties of the original message ID only for those who know the message ID's session point.
+Instead, nodes offering delivery will choose a scalar `s ∈ 𝕫` using a CPRNG and compute a new scalar `s' = sₘ * s`. Then, they compute a point `P = Pₘ * s'`. These computations yield a new message ID that maintains the verifiability properties of the original message ID only for those who know the message ID's original value of `s₀`.
 
 #### Verification of delivery offers
 
-For any channel `ch`, the handshake hash and the recipient's public key are known to both sender and receiver. With that information, the receiver can determine if the session point used to create the original message ID matches their session point for `ch`.
+For any channel `ch`, the handshake hash and the recipient's public key are known to both sender and receiver. With that information, the receiver can determine if the `s₀` used to create the original message ID matches any of the expected values for `ch`.
 
 When a node receives a delivery offer, it will test the message ID against each of its open channels by following these steps:
-1. It will derive `s₀` from a channel's handshake hash, its public key and the number of hours since the unix epoch. Implementations should perform this test several times, each with a different value for the timestamp. Implementations should go back at least 12 hours to ensure they don't miss deliveries of older messages.
-2. It will compute `s = sₘ * s₀`.
-3. The node will compute `P = s * base` where `base` is the curve's base point.
-If `P` equals `Pₘ`, the message on offer belongs to the tested channel, and the recipient will issue a message request packet.
+1. It will derive a set of possibile scalar values `S` from a channel's handshake hash, its public key and the number of hours since the unix epoch. Implementations with RTCs should generate a scalar for at least the previous 24 hours. It will also add to `S` at least 64 messages before and after the most recent message seq value it has received on the channel `ch`.
+2. Perform steps 3-4 for each `s₀ ∈ S`.
+3. Compute `s = sₘ * s₀`.
+4. Compute `P = s * base` where `base` is the curve's base point.
+5. If `P` equals `Pₘ`, the message on offer belongs to the tested channel, and the recipient will exit and issue a message request packet.
 
 ### Message request packets
 
@@ -115,6 +128,34 @@ Binary spray-and-wait performs very well, even compared to other DTN routing mec
 Stochastic spray and wait differs in that the recipient of a message randomly adjusts the number of copies of each message they receive. This adjustment may include the recipient destroying their only copy and never advertising or delivering it. The relay never learns how the count was adjusted. This adjustment helps mitigate active fingerprinting attacks by preventing the attacker from knowing exactly how many copies of a message are on the network.
 
 Additionally, Liminality defines a maximum TTL of 72 hours. Since nodes do not timestamp their messages at the network level, i.e., in plaintext, a node begins this TTL timer when it receives a new message for the first time. Implementations may choose a shorter TTL if desired. Shorter TTLs make the effects of an active fingerprinting attack shorter-lived.
+
+## Format of noise messages
+
+Data from the application layer is packaged into a noise message along with some metadata that nodes use to synchronize channel state during periods of intermittent connectivity. The plaintext inserted into a noise message uses the following format:
+
+| Bytes | Field name | Purpose |
+|---|---|---|
+| 0:3 | Packet number | A big-endian 32-bit integer containing the number of packets before this one sent through the channel by this packet's sender. Each direction in a channel will have independent sequence numbers. |
+| 4 | Command byte | Describes the type of packet contained in all subsequent data. |
+| 5 | Capabilities byte | Describes the capabilities of the sender. |
+| 6: | Payload | Contains the payload of the message. The meaning of this payload is different for different values of the command byte. |
+
+The following command bytes are defined:
+
+| Value | Command name | Payload description |
+|---|---|---|
+| 0 | Message | Raw data from the application layer. |
+| 1 | Retransmit | Flat list of big endian 32-bit packet numbers that the node wants its peer to retransmit. |
+| 2-255 | Reserved | Reserved |
+
+Capabilities are boolean flags packed into 8 bits.
+
+| Bit | Capability name | Description |
+|---|---|---|
+| 7 | RTC | The sender has an RTC available with an accurate time and date (within an hour). |
+| 6 | Gateway | The sender has direct access to the internet. |
+| 5:0 | Reserved | Reserved |
+
 
 ## Routing state machine
 
@@ -168,13 +209,17 @@ A typical encounter between Liminality peers follows:
 
 If Alice wants to talk to Bob, she must ask Bob out-of-band for a 32-byte noise public key and a 32-byte big-endian scalar value that Bob will use as `s₀` to determine if any particular message on the network is from Alice. Alice will use this `s₀` for her initial message, but each subsequent message in their channel will calculate `s₀` from their handshake hash.
 
-## Known issues
+#### Channel de-synchronization
 
-1. If an adversary obtains a message ID belonging to a channel with known endpoints, they can replay delivery offers to any node they encounter by multiplying that message ID by a new random scalar each time. The attacker can know they will always trigger message requests from the recipient. This replay attack can cause recipients to identify themselves repeatedly, which could be used by an attacker to fingerprint and track a node. This replay will only work until the TTL expires. A future version of Liminality will address this more robustly.
+If either node in a channel does not have an RTC, message IDs will be entirely dependant on the sequence number, meaning either peer going offline for an extended period of time and missing 64 or more messages will be unable to re-establish bidirectional communication. The workaround for this is to include an RTC on any hardware implementing this protocol.
 
-## Implementation Gotchas
+## Implementation gotchas
 
 1. Each node must maintain a list of handshake hashes they've seen in the past and must not respond to any incoming handshake request with a handshake hash identical to one they've seen previously. A duplicate handshake hash would indicate a replay attack according to the note under property 3 of the [noise protocol specification, section 7.8](http://www.noiseprotocol.org/noise.html#identity-hiding).
+2. Each node must maintain a list of message IDs they've seen before, and must not issue message requests for messages they've seen already. Specifically, they must maintain a list of `s₀` values for messages they've received. This prevents replay attacks, which could otherwise allow attackers to trigger message requests from a given node at will.
+3. A node should not issue a message request for a particular message ID's `s₀` value more than three times. This ensures that any malicious actor trying to follow a node around the network can't do so more than three times.
+4. Implementations with human users should allow those users to block or ignore channels they are no longer interested in maintaining.
+5. Implementations with human users should notify the user that a peer may be acting maliciously if the implementation has requested messages from that peer's channel more than ten times without any message deliveries. This counter should reset for each successful message delivery. This reduces the risk of an attacker who has obtained a peer's keys being able to track a user through physical space.
 
 ## Feedback!
 
